@@ -73,7 +73,7 @@
           <div v-for="image in filteredImages" :key="image.filename" class="image-card" :class="{ selected: selectedImages.includes(image.filename) }">
             <div class="image-wrapper">
               <el-checkbox v-model="selectedImages" :label="image.filename" class="image-checkbox" />
-              <el-image :src="image.url" :alt="image.filename" fit="cover" class="image-preview" loading="lazy" @click="previewImage(image)">
+              <el-image :src="image.thumbnailUrl || image.url" :alt="image.filename" fit="cover" class="image-preview" loading="lazy" @click="previewImage(image)">
                 <template #error>
                   <div class="image-error">
                     <el-icon size="32"><PictureFilled /></el-icon>
@@ -83,11 +83,11 @@
               </el-image>
               <div class="image-overlay">
                 <el-button-group>
-                  <el-button :icon="View" circle size="small" @click.stop="previewImage(image)" />
-                  <el-button :icon="Download" circle size="small" @click.stop="downloadImage(image)" />
+                  <el-button :icon="View" circle size="small" @click.stop="previewImage(image)" title="查看原图" />
+                  <el-button :icon="Download" circle size="small" @click.stop="downloadImage(image)" title="下载" />
                   <el-popconfirm title="确定要删除这张图片吗？" @confirm="deleteImage(image.filename)" popper-class="admin-popconfirm">
                     <template #reference>
-                      <el-button :icon="Delete" circle size="small" type="danger" @click.stop />
+                      <el-button :icon="Delete" circle size="small" type="danger" @click.stop title="删除" />
                     </template>
                   </el-popconfirm>
                 </el-button-group>
@@ -113,7 +113,7 @@
           <el-table-column type="selection" width="55" />
           <el-table-column label="预览" width="80">
             <template #default="{ row }">
-              <el-image :src="row.url" :alt="row.filename" fit="cover" style="width: 50px; height: 50px; border-radius: 4px" @click="previewImage(row)" class="table-preview" />
+              <el-image :src="row.thumbnailUrl || row.url" :alt="row.filename" fit="cover" style="width: 50px; height: 50px; border-radius: 4px; cursor: pointer;" @click="previewImage(row)" class="table-preview" />
             </template>
           </el-table-column>
           <el-table-column prop="filename" label="文件名" min-width="200">
@@ -146,12 +146,35 @@
       </div>
     </el-card>
 
-    <!-- 图片预览对话框 -->
-    <el-dialog v-model="previewVisible" :title="currentImage?.filename" width="80%" top="5vh" append-to-body>
+    <!-- 图片预览对话框 - 显示原图 -->
+    <el-dialog 
+      v-model="previewVisible" 
+      :title="currentImage?.filename" 
+      :width="isMobile ? '95%' : '80%'" 
+      :top="isMobile ? '2vh' : '5vh'" 
+      append-to-body 
+      class="image-preview-dialog"
+    >
       <div v-if="currentImage" class="preview-content">
-        <el-image :src="currentImage.url" :alt="currentImage.filename" fit="contain" class="preview-image" />
+        <div class="preview-image-wrapper">
+          <el-image 
+            :src="currentImage.url" 
+            :alt="currentImage.filename" 
+            fit="contain" 
+            class="preview-image"
+            :preview-src-list="[currentImage.url]"
+            :initial-index="0"
+          >
+            <template #error>
+              <div class="preview-error">
+                <el-icon size="64"><PictureFilled /></el-icon>
+                <p>原图加载失败</p>
+              </div>
+            </template>
+          </el-image>
+        </div>
         <div class="preview-info">
-          <el-descriptions :column="2" border size="small">
+          <el-descriptions :column="isMobile ? 1 : 2" border size="small">
             <el-descriptions-item label="文件名">
               {{ currentImage.filename }}
             </el-descriptions-item>
@@ -161,9 +184,9 @@
             <el-descriptions-item label="上传时间">
               {{ currentImage.uploadTime }}
             </el-descriptions-item>
-            <el-descriptions-item label="图片链接">
-              <el-link :href="currentImage.url" target="_blank">
-                {{ currentImage.url }}
+            <el-descriptions-item label="图片链接" :span="isMobile ? 1 : 2">
+              <el-link :href="currentImage.url" target="_blank" :underline="false">
+                {{ isMobile ? '点击查看' : currentImage.url }}
               </el-link>
             </el-descriptions-item>
           </el-descriptions>
@@ -171,16 +194,13 @@
       </div>
       <template #footer>
         <div class="preview-actions">
-          <el-button @click="copyUrl(currentImage?.url)">
-            <el-icon><CopyDocument /></el-icon>
-            复制链接
+          <el-button @click="copyUrl(currentImage?.url)" :icon="CopyDocument">
+            {{ isMobile ? '复制' : '复制链接' }}
           </el-button>
-          <el-button @click="downloadImage(currentImage)">
-            <el-icon><Download /></el-icon>
-            下载
+          <el-button @click="downloadImage(currentImage)" :icon="Download">
+            {{ isMobile ? '下载' : '下载图片' }}
           </el-button>
-          <el-button type="danger" @click="deleteImage(currentImage?.filename)">
-            <el-icon><Delete /></el-icon>
+          <el-button type="danger" @click="deleteImage(currentImage?.filename)" :icon="Delete">
             删除
           </el-button>
         </div>
@@ -190,7 +210,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { PictureRounded, PictureFilled, Refresh, View, Search, Delete, Download, CopyDocument } from '@element-plus/icons-vue'
 import { imageAPI, adminAPI } from '../utils/api'
@@ -205,6 +225,12 @@ const viewMode = ref('grid')
 const searchText = ref('')
 const sortBy = ref('time-desc')
 const selectedImages = ref([])
+const isMobile = ref(false)
+
+// 检测是否是移动设备
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
 
 // 筛选后的图片列表
 const filteredImages = computed(() => {
@@ -415,7 +441,13 @@ const formatTime = timeStr => {
 }
 
 onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
   loadImages()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
 })
 </script>
 
@@ -568,10 +600,30 @@ onMounted(() => {
   text-align: center;
 }
 
+.preview-image-wrapper {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .preview-image {
   max-width: 100%;
   max-height: 60vh;
-  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #909399;
 }
 
 .preview-info {
@@ -582,13 +634,14 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .image-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
   }
 
   .image-preview {
@@ -605,12 +658,91 @@ onMounted(() => {
     align-items: flex-start;
   }
 
+  .header-left,
+  .header-right {
+    width: 100%;
+  }
+
+  .header-right .el-button-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .header-right .el-button {
+    flex: 1;
+  }
+
   .filter-section .el-col {
     margin-bottom: 12px;
   }
 
+  .image-overlay {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .image-overlay .el-button-group {
+    transform: scale(0.9);
+  }
+
+  .preview-image-wrapper {
+    padding: 10px;
+    min-height: 200px;
+  }
+
+  .preview-image {
+    max-height: 50vh;
+  }
+
   .preview-actions {
-    flex-direction: column;
+    gap: 8px;
+  }
+
+  .preview-actions .el-button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 移动端列表视图优化 */
+  .list-view :deep(.el-table) {
+    font-size: 12px;
+  }
+
+  .list-view :deep(.el-button) {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+}
+
+/* 超小屏幕适配 */
+@media (max-width: 480px) {
+  .image-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .image-preview {
+    height: 120px;
+  }
+
+  .image-error {
+    height: 120px;
+  }
+
+  .image-info {
+    padding: 12px;
+  }
+
+  .image-filename {
+    font-size: 12px;
+  }
+
+  .image-meta {
+    font-size: 10px;
+  }
+
+  .preview-actions .el-button {
+    font-size: 12px;
   }
 }
 

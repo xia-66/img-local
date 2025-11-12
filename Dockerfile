@@ -24,10 +24,15 @@ FROM node:22-alpine AS production
 ENV NODE_ENV=production
 ENV PORT=33000
 
-# 安装必要的系统依赖
+# 安装运行时依赖和构建依赖
 RUN apk add --no-cache \
     dumb-init \
     curl \
+    vips \
+    && apk add --no-cache --virtual .build-deps \
+    build-base \
+    python3 \
+    vips-dev \
     && rm -rf /var/cache/apk/*
 
 # 创建应用目录
@@ -36,7 +41,9 @@ WORKDIR /app
 # 复制package.json和安装生产依赖
 COPY package*.json ./
 RUN npm ci --only=production && \
-    npm cache clean --force
+    npm cache clean --force && \
+    apk del .build-deps && \
+    rm -rf /tmp/* /var/cache/apk/*
 
 # 复制服务器文件
 COPY server.js ./
@@ -44,8 +51,8 @@ COPY server.js ./
 # 从构建阶段复制前端构建文件
 COPY --from=frontend-builder /app/dist ./dist
 
-# 创建必要的目录
-RUN mkdir -p uploads logs
+# 创建必要的目录（包括缩略图目录）
+RUN mkdir -p uploads/thumbnails logs
 
 # 暴露端口
 EXPOSE 33000

@@ -6,6 +6,7 @@ import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 
@@ -69,8 +70,30 @@ app.use(express.static('dist'))
 
 // 确保上传目录存在（固定为uploads目录）
 const uploadDir = path.join(__dirname, 'uploads')
+const thumbnailDir = path.join(__dirname, 'uploads', 'thumbnails')
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true })
+}
+if (!fs.existsSync(thumbnailDir)) {
+  fs.mkdirSync(thumbnailDir, { recursive: true })
+}
+
+// 生成缩略图的函数
+async function generateThumbnail(filePath, filename) {
+  try {
+    const thumbnailPath = path.join(thumbnailDir, filename)
+    await sharp(filePath)
+      .resize(400, 400, {
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: 80 })
+      .toFile(thumbnailPath)
+    return thumbnailPath
+  } catch (error) {
+    console.error('生成缩略图失败:', error)
+    return null
+  }
 }
 
 // JWT验证中间件
@@ -192,6 +215,12 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 
     const baseUrl = getBaseUrl(req)
     const imageUrl = `${baseUrl}/uploads/${req.file.filename}`
+    const filePath = path.join(uploadDir, req.file.filename)
+
+    // 异步生成缩略图（不阻塞响应）
+    generateThumbnail(filePath, req.file.filename).catch(err => {
+      console.error('生成缩略图失败:', err)
+    })
 
     res.json({
       success: true,
@@ -214,31 +243,42 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 })
 
 // 获取所有已上传的图片列表
-app.get('/api/images', (req, res) => {
+app.get('/api/images', async (req, res) => {
   try {
     const files = fs.readdirSync(uploadDir)
     const baseUrl = getBaseUrl(req)
 
-    const images = files
-      .filter(file => {
-        const ext = path.extname(file).toLowerCase()
-        return SUPPORTED_IMAGE_EXTENSIONS.includes(ext)
-      })
-      .map(file => {
-        const filePath = path.join(uploadDir, file)
-        const stats = fs.statSync(filePath)
-        return {
-          filename: file,
-          url: `${baseUrl}/uploads/${file}`,
-          size: stats.size,
-          uploadTime: stats.mtime.toLocaleString('zh-CN')
-        }
-      })
-      .sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime))
+    const images = await Promise.all(
+      files
+        .filter(file => {
+          const ext = path.extname(file).toLowerCase()
+          return SUPPORTED_IMAGE_EXTENSIONS.includes(ext)
+        })
+        .map(async file => {
+          const filePath = path.join(uploadDir, file)
+          const thumbnailPath = path.join(thumbnailDir, file)
+          const stats = fs.statSync(filePath)
+
+          // 如果缩略图不存在，生成它
+          if (!fs.existsSync(thumbnailPath)) {
+            await generateThumbnail(filePath, file)
+          }
+
+          return {
+            filename: file,
+            url: `${baseUrl}/uploads/${file}`,
+            thumbnailUrl: `${baseUrl}/uploads/thumbnails/${file}`,
+            size: stats.size,
+            uploadTime: stats.mtime.toLocaleString('zh-CN')
+          }
+        })
+    )
+
+    const sortedImages = images.sort((a, b) => new Date(b.uploadTime) - new Date(a.uploadTime))
 
     res.json({
       success: true,
-      data: images
+      data: sortedImages
     })
   } catch (error) {
     console.error('获取图片列表错误:', error)
@@ -287,12 +327,20 @@ app.delete('/api/admin/images/:filename', authenticateToken, (req, res) => {
   try {
     const filename = req.params.filename
     const filePath = path.join(uploadDir, filename)
+    const thumbnailPath = path.join(thumbnailDir, filename)
 
     if (!fs.existsSync(filePath)) {
       return sendError(res, 404, '文件不存在')
     }
 
+    // 删除原图
     fs.unlinkSync(filePath)
+    
+    // 删除缩略图（如果存在）
+    if (fs.existsSync(thumbnailPath)) {
+      fs.unlinkSync(thumbnailPath)
+    }
+
     res.json({
       success: true,
       message: '图片删除成功'
@@ -311,12 +359,20 @@ app.delete('/api/images/:filename', (req, res) => {
   try {
     const filename = req.params.filename
     const filePath = path.join(uploadDir, filename)
+    const thumbnailPath = path.join(thumbnailDir, filename)
 
     if (!fs.existsSync(filePath)) {
       return sendError(res, 404, '文件不存在')
     }
 
+    // 删除原图
     fs.unlinkSync(filePath)
+    
+    // 删除缩略图（如果存在）
+    if (fs.existsSync(thumbnailPath)) {
+      fs.unlinkSync(thumbnailPath)
+    }
+
     res.json({
       success: true,
       message: '图片删除成功'
@@ -340,7 +396,16 @@ app.delete('/api/admin/images', authenticateToken, (req, res) => {
       const ext = path.extname(file).toLowerCase()
       if (SUPPORTED_IMAGE_EXTENSIONS.includes(ext)) {
         const filePath = path.join(uploadDir, file)
+        const thumbnailPath = path.join(thumbnailDir, file)
+        
+        // 删除原图
         fs.unlinkSync(filePath)
+        
+        // 删除缩略图（如果存在）
+        if (fs.existsSync(thumbnailPath)) {
+          fs.unlinkSync(thumbnailPath)
+        }
+        
         deletedCount++
       }
     })
