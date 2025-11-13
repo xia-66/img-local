@@ -1,4 +1,4 @@
-# 📸 Vue 图床
+# 📸 图床 img-local
 
 一个现代化的图床应用，基于 Vue 3 + Element Plus + Node.js 开发，支持图片上传、展示和后台管理，支持 Docker 一键部署。
 
@@ -41,10 +41,10 @@
 
 ```bash
 # 1. 创建项目目录
-mkdir vue-img && cd vue-img
+mkdir img-local && cd img-local
 
 # 2. 下载配置文件
-curl -O https://raw.githubusercontent.com/heiyus/vue-img/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/xia-66/img-local/main/docker-compose.yml
 
 # 3. 启动服务（.env文件会自动生成）
 docker-compose up -d
@@ -58,11 +58,11 @@ docker-compose up -d
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/heiyus/vue-img.git
-cd vue-img
+git clone https://github.com/xia-66/img-local.git
+cd img-local
 
 # 2. 构建镜像
-docker build -t vue-img:latest .
+docker build -t img-local:latest .
 
 # 3. 启动服务
 docker-compose up -d
@@ -74,8 +74,8 @@ docker-compose up -d
 
 ```bash
 # 克隆项目
-git clone https://github.com/heiyus/vue-img.git
-cd vue-img
+git clone https://github.com/xia-66/img-local.git
+cd img-local
 
 # 安装依赖
 npm install
@@ -291,7 +291,7 @@ npm start
 
 ```bash
 npm install -g pm2
-pm2 start server.js --name "vue-img"
+pm2 start server.js --name "img-local"
 pm2 startup
 pm2 save
 ```
@@ -337,7 +337,7 @@ server {
 
 ## 🐛 问题反馈
 
-如果遇到任何问题，请在 [Issues](https://github.com/yourusername/local-image-host/issues) 页面提交反馈。
+如果遇到任何问题，请在 [Issues](https://github.com/xia-66/img-local/issues) 页面提交反馈。
 
 ---
 

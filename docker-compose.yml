@@ -1,7 +1,7 @@
 services:
-  vue-img:
-    image: heiyus/vue-img:latest
-    container_name: vue-img
+  img-local:
+    image: xia-66/img-local:latest
+    container_name: img-local
     ports:
       - '33000:33000'
     volumes:
