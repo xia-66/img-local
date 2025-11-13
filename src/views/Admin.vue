@@ -1,15 +1,6 @@
 <template>
   <div class="admin-page">
     <div class="admin-container">
-      <!-- 页面标题 -->
-      <div class="page-header">
-        <h1>
-          <el-icon size="28"><Setting /></el-icon>
-          后台管理
-        </h1>
-        <p>图床系统管理控制台</p>
-      </div>
-
       <!-- 统计信息 -->
       <div class="stats-section">
         <el-row :gutter="20">
@@ -53,39 +44,6 @@
             </el-card>
           </el-col>
         </el-row>
-      </div>
-
-      <!-- 管理操作 -->
-      <div class="management-section">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <el-icon size="20"><Tools /></el-icon>
-              <span>系统管理</span>
-            </div>
-          </template>
-
-          <div class="management-actions">
-            <el-row :gutter="20">
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-button type="primary" :icon="Refresh" @click="refreshStats" :loading="statsLoading" class="action-button"> 刷新统计 </el-button>
-              </el-col>
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-button type="success" :icon="Download" @click="exportData" class="action-button"> 导出数据 </el-button>
-              </el-col>
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-button type="warning" :icon="DocumentCopy" @click="showSystemInfo" class="action-button"> 系统信息 </el-button>
-              </el-col>
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-popconfirm title="确定要清空所有图片吗？此操作无法撤销！" @confirm="clearAllImages" confirm-button-text="确认清空" cancel-button-text="取消" confirm-button-type="danger" popper-class="admin-popconfirm">
-                  <template #reference>
-                    <el-button type="danger" :icon="Delete" :loading="clearLoading" class="action-button"> 清空图片 </el-button>
-                  </template>
-                </el-popconfirm>
-              </el-col>
-            </el-row>
-          </div>
-        </el-card>
       </div>
 
       <!-- 图片管理 -->

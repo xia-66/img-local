@@ -1,6 +1,6 @@
 services:
   img-local:
-    image: ghcr.io/xia-66/img-local:latest
+    image: ghcr.io/xia-66/img-local:1.0.0
     container_name: img-local
     ports:
       - '33000:33000'
